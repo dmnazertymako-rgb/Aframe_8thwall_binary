@@ -11,7 +11,7 @@ Think of it like an interactive poster: a printed image becomes a trigger that m
 | Tool | What it is | Why we use it |
 |------|-----------|---------------|
 | **A-Frame (8frame 1.3.0)** | An open-source framework for building 3D scenes in a web page, using simple HTML tags. You write `<a-box color="red">` and a red cube appears. No 3D software needed. | It makes 3D accessible to people who know basic HTML. You describe your scene like you write a web page. |
-| **8th Wall Engine** (from Niantic) | An AR engine that uses the phone camera to detect images and track their position in real time. It is the "brain" that recognizes your printed poster and knows where to place the 3D content. | It runs directly in the browser (WebAR). Other AR tools require building a native app. This one works with just a URL. |
+| **8th Wall Engine** (from Niantic) | An AR engine that uses the phone camera to detect images and track their position in real time. It is the part that recognizes your printed poster and knows where to place the 3D content. | It runs directly in the browser (WebAR). Other AR tools require building a native app. This one works with just a URL. |
 | **XRExtras** | A helper library from 8th Wall that provides a loading screen, error messages, and gesture detection out of the box. | Without it, you would have to code your own loading spinner, camera permission prompts, etc. It handles all of that. |
 
 ### How does it work in practice?
@@ -132,7 +132,9 @@ A "fork" creates your own copy of this project on your GitHub account. You can t
 
 ### Step 2: Choose your working environment
 
-You have two options. **Option A (Firebase Studio)** is the easiest — everything runs in the browser, no software to install. **Option B (VS Code)** gives you more control and works offline.
+You have two options :
+- **Option A (Firebase Studio)** is the easiest — everything runs in the browser, no software to install. 
+- **Option B (VS Code)** gives you more control and works offline.
 
 ---
 
@@ -152,15 +154,19 @@ Firebase Studio (formerly called Project IDX) is a free online code editor from 
 
 **To edit an example:**
 - Open any file in `examples/` from the file tree on the left (for example, `examples/01_primitives.html`)
+- Make a copy of this file and change its name.
 - Make a change (for example, change `color="#FF0055"` to `color="blue"`)
 - Save the file (`Ctrl+S`)
 - Refresh the preview panel to see the change
+
+If you want your experience to work when you load the page you need to rename the modified example to "index.html" this file is the one that load automatically (rename the file with the cards and all the examples into something like 'landingpage.html').
 
 **To push your changes back to GitHub:**
 - Click the Source Control icon in the left sidebar (the branch icon)
 - You will see your changed files listed
 - Type a short message describing what you changed (for example: "Changed cube color to blue")
-- Click **Commit & Push**
+- Add the files you changed 
+- Click **Commit & Push** 
 
 ---
 
@@ -407,6 +413,29 @@ imageTargetData: [{
   }
 }]
 ```
+
+**Understanding the properties:**
+
+| Property | Description |
+|---|---|
+| `left`, `top` | Pixel offset of the target region within the source image. If you are using a standalone image (not a sprite sheet), keep both at **0**. These only matter when several targets are packed into a single atlas image — `left` and `top` then indicate where the sub-image starts. |
+| `width`, `height` | The pixel dimensions of the region the tracker should use. For a standalone image this is simply the image's pixel width and height. The **aspect ratio** (`width / height`) is critical: the engine uses it to know the shape of the target so it can compute the correct 3D pose. If these don't match the real image, tracking will be jittery or fail. |
+| `originalWidth`, `originalHeight` | The full pixel dimensions of the source file. For a standalone image, set them **equal to `width` and `height`**. When targets are packed in a sprite sheet, these describe the total atlas size so the engine can locate the sub-region defined by `left`, `top`, `width`, `height`. |
+| `isRotated` | Sprite-sheet flag. Set to `false` unless your atlas tool rotated the sub-image 90° to save space. |
+
+> **In practice**, for a single image target you only need to set `width` and `height` to your image's pixel dimensions and copy them into `originalWidth` / `originalHeight`. Keep `left` and `top` at 0 and `isRotated` at false.
+
+**Preparing your image — resolution, color, and performance:**
+
+- **Recommended resolution: 480–1024 px on the longest side.** The tracking engine downscales the image internally to extract feature points — it does not benefit from resolutions above ~1024 px. A 640×480 image tracks just as reliably as a 4K one.
+- **Do NOT use a 4K image as-is.** A 3840×2160 image weighs several MB. The engine must download it, decode it into a full-resolution bitmap in memory, and then downsample it before feature extraction. On a phone this means:
+  - **Longer startup** — the image must be fetched and decoded before tracking can begin.
+  - **Higher memory spike** — a 4K RGBA bitmap uses ~32 MB of RAM just for the decode step, which can cause frame drops or even a crash on low-end devices.
+  - **No tracking improvement** — the internal feature detector works at a fixed lower resolution regardless of input size. Extra pixels are thrown away.
+  - Resize beforehand to ~768 px on the longest side for the best balance of quality and performance.
+- **Keep the image in color (RGB).** The engine converts the image to grayscale internally for feature detection, but you should NOT pre-convert it to black and white yourself. Supplying a color image preserves more tonal information during the engine's own conversion pipeline. Manually converting to B&W can flatten details (e.g., two colors with different hues but similar brightness become the same gray), reducing the number of usable feature points and hurting tracking quality.
+- **Use JPEG for photos, PNG for graphics.** JPEG at 80–90% quality keeps file size small with negligible tracking impact. Use PNG only for images with sharp edges or transparency. Avoid uncompressed formats (BMP, TIFF).
+- **Aspect ratio matters more than resolution.** Make sure `width` and `height` in the configuration match the actual pixel dimensions of the file you provide. A mismatch causes the engine to compute an incorrect 3D pose, leading to jittery or offset AR content — even if the image is otherwise perfect for tracking.
 
 4. **Print your image** and test with your phone
 
